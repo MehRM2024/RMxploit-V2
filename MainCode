@@ -1,0 +1,185 @@
+--Main LS
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+
+--Services!!
+local PlayerService = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+--Important!!
+local LocalPlayer = PlayerService.LocalPlayer
+local PlayerCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+--Other
+local Remotes = ReplicatedStorage.Remotes
+local Items = ReplicatedStorage.Items
+if Remotes:FindFirstChild("PlayerMutant") then
+    local PlayerMutant = Remotes.PlayerMutant
+else
+    warn("PlayerMutant remote not found.")
+end
+
+--[[\\MAIN CODE//]]
+local window = DrRayLibrary:Load("RMxploit V2", "Default")
+
+local tab1 = DrRayLibrary.newTab("Main", "ImageIdHere")
+
+tab1.newLabel("Basic stuff")
+
+tab1.newButton("Third Person", "Puts you in third person!", function()
+    LocalPlayer.CameraMode = Enum.CameraMode.Classic
+end)
+
+tab1.newButton("First Person", "Puts you in first person!", function()
+    LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+end)
+
+local normalCameraConnection
+
+tab1.newToggle("Normal Camera", "Turns your camera into the normal one!", true, function(toggleState)
+    if toggleState then
+        if normalCameraConnection then normalCameraConnection:Disconnect() end
+        normalCameraConnection = RunService.Heartbeat:Connect(function()
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMaxZoomDistance = 16
+            LocalPlayer.CameraMinZoomDistance = 0
+        end)
+    else
+        if normalCameraConnection then
+            normalCameraConnection:Disconnect()
+            normalCameraConnection = nil
+        end
+        LocalPlayer.CameraMinZoomDistance = 5
+    end
+end)
+
+local CurrentCamera = Workspace.CurrentCamera
+local snowballToggleState = false
+local inputConnection
+
+local raycastParams = RaycastParams.new()
+raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+local ignoreList = {}
+
+if not Workspace:FindFirstChild("ProjectileIgnore") then
+    for _, instance in pairs(Workspace:GetDescendants()) do
+        if (instance:IsA("Part") or instance:IsA("UnionOperation") or instance:IsA("BasePart")) and instance.Transparency == 1 and instance.Anchored then
+            table.insert(ignoreList, instance)
+        end
+    end
+
+    Workspace.DescendantAdded:Connect(function(descendant)
+        if (descendant:IsA("Part") or descendant:IsA("UnionOperation") or descendant:IsA("BasePart")) and descendant.Transparency == 1 and descendant.Anchored then
+            table.insert(ignoreList, descendant)
+        end
+    end)
+
+    if LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                table.insert(ignoreList, part)
+            end
+        end
+    end
+end
+
+raycastParams.FilterDescendantsInstances = ignoreList
+
+tab1.newToggle("Click to throw SnowBall", "Click anywhere to throw a snowball at your click location!", true, function(toggleState)
+    snowballToggleState = toggleState
+
+    if toggleState then
+        if inputConnection then inputConnection:Disconnect() end
+        inputConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not snowballToggleState then return end -- Check if still toggled ON
+
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local x, y = input.Position.X, input.Position.Y
+                local ray = CurrentCamera:ScreenPointToRay(x, y)
+                local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
+
+                if result then
+                    Remotes.Projectile:FireServer("Snowball", LocalPlayer.Character.HumanoidRootPart.Position, result.Position)
+                end
+            end
+        end)
+    else
+        if inputConnection then
+            inputConnection:Disconnect()
+            inputConnection = nil
+        end
+    end
+end)
+
+local sprintConnection
+
+tab1.newToggle("Unlimited Sprint", "Gives you INFINITE Stamina!", true, function(toggleState)
+    if toggleState then
+        if sprintConnection then sprintConnection:Disconnect() end
+        sprintConnection = RunService.Heartbeat:Connect(function()
+            if PlayerCharacter and PlayerCharacter:FindFirstChild("Sprint") and PlayerCharacter.Sprint:FindFirstChild("Stam") then
+                PlayerCharacter.Sprint.Stam.Value = 5
+            end
+        end)
+    else
+        if sprintConnection then
+            sprintConnection:Disconnect()
+            sprintConnection = nil
+        end
+    end
+end)
+
+local tab2 = DrRayLibrary.newTab("Night 1", "ImageIdLogoHere")
+
+tab2.newLabel("PvP (also works on normal mode)")
+
+tab2.newInput("Kill Player Input", "Putting a Player's Username here will kill THAT player (may or may not work.)", function(text)
+    local targetPlayer = PlayerService:FindFirstChild(text)
+    if targetPlayer and Remotes:FindFirstChild("PlayerMutant") then
+        Remotes.PlayerMutant:FireServer("Kill", targetPlayer)
+    else
+        warn("Player not found or PlayerMutant not found:", text)
+    end
+end)
+
+local scareConnection
+
+tab2.newToggle("Auto-Scare", "Requires at least one camera placed!", true, function(toggleState)
+    if toggleState then
+        if scareConnection then scareConnection:Disconnect() end
+        scareConnection = Workspace.ChildAdded:Connect(function(Larry)
+            if Larry.Name == "Mutant" or Larry:FindFirstChild("Cube.012") then
+                Remotes.FlashCam:FireServer("1")
+            end
+        end)
+    else
+        if scareConnection then
+            scareConnection:Disconnect()
+            scareConnection = nil
+        end
+    end
+end)
+
+local tab3 = DrRayLibrary.newTab("Night 2", "ImageIdHere")
+
+tab3.newDropdown("Request Delivery:", "Select one of these items to deliver them!", {"UVLamp", "Camera", "Lock", "MotionSensor"}, function(selectedOption)
+    Remotes.Delivery:FireServer(selectedOption)
+end)
+
+tab3.newButton("Load Character", "Re-Loads your character! (Likely a Revive)", function()
+    Remotes.LoadCharacter:FireServer()
+end)
+
+local tab4 = DrRayLibrary.newTab("EXTRAS", "ImageIdHere")
+
+tab4.newDropdown("Give Item:", "Select one of these items to get them!", {"SnowBall", "Tablet"}, function(selectedOption)
+    local ItemClone = Items:FindFirstChild(selectedOption)
+    if ItemClone then
+        ItemClone:Clone().Parent = LocalPlayer.Backpack
+    else
+        warn("Item not found:", selectedOption)
+    end
+end)
