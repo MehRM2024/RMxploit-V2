@@ -11,17 +11,24 @@ local Workspace = game:GetService("Workspace")
 --Important!!
 local LocalPlayer = PlayerService.LocalPlayer
 local PlayerCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = PlayerCharacter:WaitForChild("Humanoid")
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    PlayerCharacter = char
+    Humanoid = char:WaitForChild("Humanoid")
+end)
 
 --Other
 local Remotes = ReplicatedStorage.Remotes
-local Items = ReplicatedStorage.Items
-if Remotes:FindFirstChild("PlayerMutant") then
-    local PlayerMutant = Remotes.PlayerMutant
-else
-    warn("PlayerMutant remote not found.")
-end
+local Items = ReplicatedStorage.Items or nil
+local PlayerMutant = Remotes:FindFirstChild("PlayerMutant") or nil
+local name = " "
 
---[[\\MAIN CODE//]]
+Remotes.Kick.Name = name
+local FakeKick = Instance.new("RemoteEvent", Remotes)
+FakeKick.Name = "Kick"
+
+--[[\MAIN CODE//]]
 local window = DrRayLibrary:Load("RMxploit V2", "Default")
 
 local tab1 = DrRayLibrary.newTab("Main", "ImageIdHere")
@@ -55,64 +62,44 @@ tab1.newToggle("Normal Camera", "Turns your camera into the normal one!", true, 
     end
 end)
 
-local CurrentCamera = Workspace.CurrentCamera
-local snowballToggleState = false
-local inputConnection
+tab1.newButton("Grab every item", "Doesn't grab dropped items", function()
+local HumanoidRootPart = PlayerCharacter.HumanoidRootPart
 
-local raycastParams = RaycastParams.new()
-raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-local ignoreList = {}
+local ItemsFolder = workspace.ItemSpots
+local originalCFrame = HumanoidRootPart.CFrame
 
-if not Workspace:FindFirstChild("ProjectileIgnore") then
-    for _, instance in pairs(Workspace:GetDescendants()) do
-        if (instance:IsA("Part") or instance:IsA("UnionOperation") or instance:IsA("BasePart")) and instance.Transparency == 1 and instance.Anchored then
-            table.insert(ignoreList, instance)
-        end
-    end
-
-    Workspace.DescendantAdded:Connect(function(descendant)
-        if (descendant:IsA("Part") or descendant:IsA("UnionOperation") or descendant:IsA("BasePart")) and descendant.Transparency == 1 and descendant.Anchored then
-            table.insert(ignoreList, descendant)
-        end
-    end)
-
-    if LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("MeshPart") then
-                table.insert(ignoreList, part)
-            end
-        end
+local clickDetectors = {}
+for _, descendant in ipairs(ItemsFolder:GetDescendants()) do
+    if descendant:IsA("ClickDetector") then
+        table.insert(clickDetectors, descendant)
     end
 end
 
-raycastParams.FilterDescendantsInstances = ignoreList
+for _, clickDetector in ipairs(clickDetectors) do
+    local part = clickDetector.Parent.Parent
+    if part and part:IsA("BasePart") then
+        HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+        task.wait(0.2)
 
-tab1.newToggle("Click to throw SnowBall", "Click anywhere to throw a snowball at your click location!", true, function(toggleState)
-    snowballToggleState = toggleState
+        fireclickdetector(clickDetector)
+        fireclickdetector(clickDetector)
 
-    if toggleState then
-        if inputConnection then inputConnection:Disconnect() end
-        inputConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not snowballToggleState then return end -- Check if still toggled ON
-
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local x, y = input.Position.X, input.Position.Y
-                local ray = CurrentCamera:ScreenPointToRay(x, y)
-                local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
-
-                if result then
-                    Remotes.Projectile:FireServer("Snowball", LocalPlayer.Character.HumanoidRootPart.Position, result.Position)
-                end
-            end
-        end)
-    else
-        if inputConnection then
-            inputConnection:Disconnect()
-            inputConnection = nil
-        end
+        task.wait(0.1)
     end
+end
+
+HumanoidRootPart.CFrame = originalCFrame
+HumanoidRootPart.Anchored = false
 end)
+
+tab1.newButton("Larry ESP", "ESP for Larry monster so he might not kill you, noob!", function()
+    ReplicatedStorage.MutantVal:Destroy()
+            task.wait(1)
+            local H = Instance.new("Highlight")
+            H.Parent = ReplicatedStorage:FindFirstChild("Mutant")
+            H.FillTransparency = 0.8
+     end
+)
 
 local sprintConnection
 
@@ -121,7 +108,7 @@ tab1.newToggle("Unlimited Sprint", "Gives you INFINITE Stamina!", true, function
         if sprintConnection then sprintConnection:Disconnect() end
         sprintConnection = RunService.Heartbeat:Connect(function()
             if PlayerCharacter and PlayerCharacter:FindFirstChild("Sprint") and PlayerCharacter.Sprint:FindFirstChild("Stam") then
-                PlayerCharacter.Sprint.Stam.Value = 5
+                PlayerCharacter.Sprint.Stam.Value = 99
             end
         end)
     else
@@ -132,17 +119,45 @@ tab1.newToggle("Unlimited Sprint", "Gives you INFINITE Stamina!", true, function
     end
 end)
 
+local OxygenConnection
+
+tab1.newToggle("Unlimited Oxygen", "Makes Generator useless! (you only)", true, function(toggleState)
+    if toggleState then
+        if OxygenConnection then OxygenConnection:Disconnect() end
+        OxygenConnection = RunService.Heartbeat:Connect(function()
+            if PlayerCharacter and PlayerCharacter:FindFirstChild("Breath") then
+                PlayerCharacter.Breath.Value = math.huge
+                game.Lighting.Blur.Enabled = false
+                workspace.Sounds.HeavyBreath.Looped = false      
+                workspace.Sounds.HeavyBreath.IsPlaying = false      
+            end
+        end)
+    else
+        if OxygenConnection then
+            OxygenConnection:Disconnect()
+            OxygenConnection = nil
+        end
+    end
+end)
+
 local tab2 = DrRayLibrary.newTab("Night 1", "ImageIdLogoHere")
 
 tab2.newLabel("PvP (also works on normal mode)")
 
 tab2.newInput("Kill Player Input", "Putting a Player's Username here will kill THAT player (may or may not work.)", function(text)
     local targetPlayer = PlayerService:FindFirstChild(text)
-    if targetPlayer and Remotes:FindFirstChild("PlayerMutant") then
-        Remotes.PlayerMutant:FireServer("Kill", targetPlayer)
+    if targetPlayer and PlayerMutant then
+        PlayerMutant:FireServer("Kill", targetPlayer)
     else
-        warn("Player not found or PlayerMutant not found:", text)
+        warn(", Make Sure you're in Night 1, Couldn't kill:", text)
     end
+end)
+
+tab2.newButton("Bloodmoon speed", "Loops your speed!", function()
+    while true do
+         PlayerCharacter.Humanoid.WalkSpeed = 30
+          task.wait()
+      end
 end)
 
 local scareConnection
@@ -151,8 +166,10 @@ tab2.newToggle("Auto-Scare", "Requires at least one camera placed!", true, funct
     if toggleState then
         if scareConnection then scareConnection:Disconnect() end
         scareConnection = Workspace.ChildAdded:Connect(function(Larry)
-            if Larry.Name == "Mutant" or Larry:FindFirstChild("Cube.012") then
+            if Larry.Name == "Mutant" and not ReplicatedStorage:FindFirstChild("Stalker") or workspace:FindFirstChild("Stalker") then
                 Remotes.FlashCam:FireServer("1")
+                Remotes.FlashCam:FireServer("2")
+               Remotes.FlashCam:FireServer("3")
             end
         end)
     else
@@ -169,10 +186,44 @@ tab3.newDropdown("Request Delivery:", "Select one of these items to deliver them
     Remotes.Delivery:FireServer(selectedOption)
 end)
 
-tab3.newButton("Load Character", "Re-Loads your character! (Likely a Revive)", function()
+tab3.newButton("Load Character", "Used for duping your starter items and Re-Loads your character! (Likely a Revive)", function()
     Remotes.LoadCharacter:FireServer()
 end)
 
+local StalkerConnection
+
+tab3.newButton("Anti Stalker view dmg", "Makes you INMUNE to Stalker view dmg (Perm)", function()
+    
+        while true do
+            PlayerCharacter.LookAt.Value = false
+            Remotes.LookAt:Destroy()
+        task.wait()
+        end
+end)
+
+tab3.newButton("Vent pests destroyer", "Makes you INMUNE to Vent Pests (Perm)", function()
+    
+        
+        while true do
+            local gridsFolder = workspace.Grids
+		for _, gridModel in gridsFolder:GetChildren() do
+            if gridModel:IsA("Model") then
+                for _, child in gridModel:GetChildren() do
+                    if child:IsA("Part") and child.Name == "Hitbox" then
+                        child:Destroy()
+                    end
+                end
+            end
+            task.wait()
+        end
+end
+
+tab3.newButton("Stalker ESP", "ESP for Stalker monster, Idk why would you need this but okay! (exec before stalker spawns)", function()
+            local H = Instance.new("Highlight")
+            H.Parent = ReplicatedStorage:FindFirstChild("Stalker")
+            H.FillTransparency = 0.8
+end)
+        
 local tab4 = DrRayLibrary.newTab("EXTRAS", "ImageIdHere")
 
 tab4.newDropdown("Give Item:", "Select one of these items to get them!", {"SnowBall", "Tablet"}, function(selectedOption)
@@ -183,3 +234,45 @@ tab4.newDropdown("Give Item:", "Select one of these items to get them!", {"SnowB
         warn("Item not found:", selectedOption)
     end
 end)
+
+
+
+tab4.newLabel("Dances, PvP anims and yk (FE)")
+
+local dances = {
+    { Name = "kill (PvP)", Id = "rbxassetid://14480016539" },
+    { Name = "BreakWindow2 (PvP)", Id = "rbxassetid://16286727904" },
+    { Name = "WindowPeek (PvP)", Id = "rbxassetid://14460648117" },
+    { Name = "Dance (PvP)", Id = "rbxassetid://18889497881" },
+    { Name = "T-Pose walk (PvP)", Id = "rbxassetid://18813647771"},
+    { Name = "Stunned Anim (PvP)", Id = "rbxassetid://102672159068788"},
+    { Name = "Drink Anim", Id = "http://www.roblox.com/Asset?ID=29517689"},
+    { Name = "Dance Anim", Id = "http://www.roblox.com/Asset?ID=35654637"},
+    { Name = "Smash Anim", Id = "rbxassetid://14896854748"},
+    { Name = "Repair Anim", Id = "rbxassetid://15236168784"},
+    { Name = "Worker1 Idle Anim", Id = "rbxassetid://14833350666"}
+}
+
+local currentTrack
+
+for i, dance in ipairs(dances) do
+    tab4.newButton(dance.Name, " ", function()
+        if currentTrack then currentTrack:Stop() end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = dance.Id
+        currentTrack = Humanoid:LoadAnimation(anim)
+        task.wait(1)
+        currentTrack:Play(0.35)
+    end)
+end
+
+tab4.newButton("Stop Current animation", "If you're playing a animation, you can stop it with this button!",  function()
+    if currentTrack then
+        currentTrack:Stop(0.25)
+        currentTrack = nil
+    end
+            end
+        )
+    end)
+
+print("EXECUTED SUCCESFULLY! [Maybe]")
